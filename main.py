@@ -31,62 +31,70 @@ grafo = {
 }
 
 def create_subgraph(main_graph, start_node, neighbor):
-    subgraph = {}
-    visited = set()
-    queue = deque([neighbor])
-    
-    while queue:
-        node = queue.popleft()
-        if node not in visited:
-            visited.add(node)
+    subgraph = {}                     # Inicializa o dicionário do subgrafo
+    visited = set()                  # Conjunto de nós já visitados
+    queue = deque([neighbor])       # Fila para BFS iniciando pelo vizinho
+
+    while queue:                    # Enquanto houver nós na fila
+        node = queue.popleft()      # Remove o próximo nó da fila
+        if node not in visited:     # Se o nó ainda não foi visitado
+            visited.add(node)       # Marca o nó como visitado
+            # Adiciona os vizinhos do nó atual ao subgrafo, exceto o nó de origem
             subgraph[node] = [n for n in main_graph[node] if n != start_node]
-            for child in main_graph[node]:
-                if child != start_node and child not in visited:
-                    queue.append(child)
-    return subgraph
+            for child in main_graph[node]:   # Para cada vizinho do nó atual
+                if child != start_node and child not in visited:  # Se não for o nó inicial e ainda não visitado
+                    queue.append(child)      # Adiciona à fila para visitar depois
+    return subgraph               # Retorna o subgrafo construído
 
 def bfs(g, start, end):
-    fila = deque([[start]])
-    caminhos = []
-    while fila:
-        caminho = fila.popleft()
-        no = caminho[-1]
-        if no == end:
-            caminhos.append(caminho)
-        else:
-            for vizinho in g.get(no, []):
-                if vizinho not in caminho:
-                    fila.append(caminho + [vizinho])
-    return caminhos
+    if start == end:                   # Edge case: início e fim são o mesmo nó
+        return [[start]]              # Retorna o caminho trivial
+
+    fila = deque([(start, [start])])  # Fila para BFS, que armazenan o nó atual e o caminho até ele
+    paths = []                        # Lista de caminhos encontrados
+
+    while fila:                       # Enquanto existirem caminhos na fila
+        current, path = fila.popleft()  # Extrai o nó atual e o caminho até ele
+        for vizinho in g.get(current, []):  # Para cada vizinho do nó atual
+            if vizinho in path:      # Evita ciclos
+                continue
+            novo_caminho = path + [vizinho]  # Cria novo caminho incluindo o vizinho
+            if vizinho == end:       # Se chegou ao destino, adiciona à lista de caminhos
+                paths.append(novo_caminho)
+            else:
+                fila.append((vizinho, novo_caminho))  # Continua explorando o caminho
+    return paths                     # Retorna todos os caminhos encontrados
 
 def busca_paralela(g, start, end):
-    vizinhos = g.get(start, [])
-    inicio = time.perf_counter()
-    resultados = []
+    vizinhos = g.get(start, [])       # Obtém todos os vizinhos do nó inicial
+    inicio = time.perf_counter()      # Marca o tempo inicial
+    resultados = []                   # Lista para armazenar os caminhos encontrados
     
-    with ProcessPoolExecutor() as executor:
-        futures = []
-        for viz in vizinhos:
-            subgraph = create_subgraph(g, start, viz)
+    with ProcessPoolExecutor() as executor:  # Cria um pool de processos paralelos
+        futures = []                  # Lista de tarefas assíncronas
+        for viz in vizinhos:         # Para cada vizinho do nó inicial
+            subgraph = create_subgraph(g, start, viz)  # Cria um subgrafo sem o nó inicial
+            # Envia uma tarefa assíncrona para encontrar caminhos a partir desse vizinho
             futures.append(
                 executor.submit(bfs, subgraph, viz, end)
-        )
+            )
         
-        for future in as_completed(futures):
-            caminhos = future.result()
-            resultados.extend([ [start] + p for p in caminhos ])
+        for future in as_completed(futures):           # À medida que as tarefas finalizam
+            caminhos = future.result()                 # Obtém o resultado da tarefa
+            resultados.extend([[start] + p for p in caminhos])  # Adiciona o nó inicial a cada caminho
     
-    fim = time.perf_counter()
+    fim = time.perf_counter()          # Marca o tempo final
     print(f"[Paralelo ] Encontrados {len(resultados)} caminhos em {fim - inicio:.6f} segundos.")
 
-    return resultados, fim - inicio
+    return resultados, fim - inicio   # Retorna os caminhos e o tempo de execução
 
+# Executa a busca de forma sequencial (sem paralelismo)
 def busca_sequencial(g, start, end):
-    inicio = time.perf_counter()
-    caminhos = bfs(g, start, end)
-    fim = time.perf_counter()
+    inicio = time.perf_counter()         # Marca o tempo inicial
+    caminhos = bfs(g, start, end)        # Executa a busca BFS normalmente
+    fim = time.perf_counter()            # Marca o tempo final
     print(f"[Sequencial] Encontrados {len(caminhos)} caminhos em {fim - inicio:.6f} segundos.")
-    return caminhos, fim - inicio
+    return caminhos, fim - inicio        # Retorna os caminhos e o tempo de execução
 
 if __name__ == '__main__':
     start_node = 'N0'
