@@ -88,7 +88,6 @@ def busca_paralela(g, start, end):
 
     return resultados, fim - inicio   # Retorna os caminhos e o tempo de execução
 
-# Executa a busca de forma sequencial (sem paralelismo)
 def busca_sequencial(g, start, end):
     inicio = time.perf_counter()         # Marca o tempo inicial
     caminhos = bfs(g, start, end)        # Executa a busca BFS normalmente
